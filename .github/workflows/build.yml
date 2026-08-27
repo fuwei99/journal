@@ -1,0 +1,103 @@
+# ============================================================
+#  构建并推送镜像到 GHCR
+#
+#  ⚠️ 后端二进制在这里下载（构建期），Dockerfile 里只做 COPY。
+#     上游地址只出现在本文件的 secrets/vars 里，成品镜像层看不到来源。
+#
+#  需要的仓库 Variables（Settings → Secrets and variables → Actions → Variables）:
+#     UPSTREAM_REPO   例: router-for-me/CLIProxyAPI
+#     UPSTREAM_TAG    例: v7.2.143   （留空 = 取 latest）
+#  权限用内置 GITHUB_TOKEN，不用额外配 PAT。
+# ============================================================
+name: build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: '后端版本 tag（留空取 latest）'
+        required: false
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 拉取后端二进制
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ vars.UPSTREAM_REPO }}
+          TAG: ${{ inputs.upstream_tag || vars.UPSTREAM_TAG }}
+        run: |
+          set -euo pipefail
+          if [ -z "${REPO:-}" ]; then
+            echo "::error::没配 UPSTREAM_REPO 变量"; exit 1
+          fi
+
+          if [ -z "${TAG:-}" ]; then
+            TAG=$(gh api "repos/$REPO/releases/latest" --jq .tag_name)
+            echo "自动取 latest: $TAG"
+          fi
+          VER="${TAG#v}"
+
+          # 用 no-plugin 版: 体积小、不加载外部插件，攻击面更小
+          ASSET="CLIProxyAPI_${VER}_linux_amd64_no-plugin.tar.gz"
+          echo "下载 $ASSET"
+          if ! gh release download "$TAG" --repo "$REPO" --pattern "$ASSET" --dir /tmp/dl; then
+            ASSET="CLIProxyAPI_${VER}_linux_amd64.tar.gz"
+            echo "no-plugin 不存在，回退 $ASSET"
+            gh release download "$TAG" --repo "$REPO" --pattern "$ASSET" --dir /tmp/dl
+          fi
+
+          mkdir -p /tmp/ex vendor
+          tar -xzf "/tmp/dl/$ASSET" -C /tmp/ex
+          BIN=$(find /tmp/ex -type f -name 'cli-proxy-api*' ! -name '*.yaml' | head -1)
+          [ -n "$BIN" ] || BIN=$(find /tmp/ex -type f -perm -u+x | head -1)
+          [ -n "$BIN" ] || { echo "::error::压缩包里没找到可执行文件"; ls -R /tmp/ex; exit 1; }
+
+          cp "$BIN" vendor/backend
+          chmod +x vendor/backend
+          echo "BACKEND_VERSION=$VER" >> "$GITHUB_ENV"
+          ls -lh vendor/backend
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 构建并推送
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.BACKEND_VERSION }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false     # 别生成 attestation，HF 拉取时更省事
+
+      - name: 输出
+        run: |
+          echo "### 镜像已推送" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "FROM ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "后端版本: ${{ env.BACKEND_VERSION }}" >> $GITHUB_STEP_SUMMARY

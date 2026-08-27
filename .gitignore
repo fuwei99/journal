@@ -1,0 +1,8 @@
+vendor/
+__pycache__/
+*.pyc
+*.log
+.env
+env.sh
+data/
+docs/

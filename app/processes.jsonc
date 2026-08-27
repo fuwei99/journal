@@ -1,0 +1,28 @@
+// 容器内进程表。supervisor.py 启动时读一次（容器生命周期内不变，无需热加载）。
+{
+  "checkInterval": 15,   // 巡检间隔(秒)
+  "startStagger": 2,     // 依次启动的间隔(秒)
+
+  "processes": [
+    {
+      "id": "core",
+      "enabled": true,
+      // 二进制在 /opt/bin/，配置由 supervisor 从环境变量渲染到 /data/config.yaml
+      "command": "/opt/bin/journal-core --config /data/config.yaml",
+      "cwd": "/data",
+      "check": { "http": "http://127.0.0.1:8080/management.html" },
+      "grace": 25,          // Go 起来要连 Postgres 拉凭据，给足时间
+      "restartDelay": 5
+    },
+    {
+      "id": "gateway",
+      "enabled": true,
+      // 唯一对外监听的进程，端口 = HF 要求的 7860
+      "command": "python3 /app/gateway.py",
+      "cwd": "/app",
+      "check": { "http": "http://127.0.0.1:7860/__health" },
+      "grace": 10,
+      "restartDelay": 3
+    }
+  ]
+}

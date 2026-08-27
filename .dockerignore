@@ -1,0 +1,11 @@
+.git
+.github
+**/__pycache__
+*.pyc
+docs/
+*.md.bak
+README.md
+deploy/
+*.log
+.env
+env.sh

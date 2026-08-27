@@ -1,0 +1,55 @@
+// 路由表 —— 改完保存即热加载，不用重启容器。
+//
+// 匹配规则: 长前缀优先，"/" 兜底垫底。
+// 加新服务: 在兜底 "/" 之前插一条即可。
+{
+  "routes": [
+    // ── 管理面板: /cpa/admin -> 后端的 management.html ──
+    {
+      "id": "cpa-admin",
+      "prefix": "/cpa/admin",
+      "target": "http://127.0.0.1:8080",
+      "rewrite": "/management.html",   // 非空则上游路径固定改写成此值
+      "enabled": true,
+      "note": "管理面板入口"
+    },
+
+    // ── API: /cpa/v1/... -> /v1/...，/cpa/v1beta/... -> /v1beta/... ──
+    // 客户端 BaseURL 填 https://<域名>/cpa 即可
+    {
+      "id": "cpa",
+      "prefix": "/cpa",
+      "target": "http://127.0.0.1:8080",
+      "strip_prefix": true,
+      "health": "http://127.0.0.1:8080/management.html",
+      "enabled": true,
+      "note": "API: /cpa/v1, /cpa/v1beta, /cpa/v0/management"
+    },
+
+    // ── 以后加服务照这个抄，放在兜底 / 之前 ──
+    // {
+    //   "id": "myapp",
+    //   "prefix": "/myapp",
+    //   "target": "http://127.0.0.1:9001",
+    //   "strip_prefix": true,        // true=剥掉 /myapp 再转发(默认)
+    //   "headers": {},               // 注入/覆盖请求头
+    //   "strip_headers": [],         // 丢掉某些请求头
+    //   "health": "http://127.0.0.1:9001/health",
+    //   "enabled": true,
+    //   "note": "说明"
+    // },
+
+    // ── 兜底: 其余全落后端 ──
+    // ⚠️ 不能删！面板 HTML 里 /assets/*.js 是绝对路径不带 /cpa 前缀，
+    //    全靠这条直落后端，删了面板白屏。
+    {
+      "id": "root",
+      "prefix": "/",
+      "target": "http://127.0.0.1:8080",
+      "strip_prefix": false,
+      "health": "http://127.0.0.1:8080/management.html",
+      "enabled": true,
+      "note": "兜底: /assets 等绝对路径资源"
+    }
+  ]
+}
