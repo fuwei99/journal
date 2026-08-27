@@ -8,7 +8,7 @@
     {
       "id": "cpa-admin",
       "prefix": "/cpa/admin",
-      "target": "http://127.0.0.1:8080",
+      "target": "http://127.0.0.1:7860",
       "rewrite": "/management.html",   // 非空则上游路径固定改写成此值
       "enabled": true,
       "note": "管理面板入口"
@@ -19,9 +19,9 @@
     {
       "id": "cpa",
       "prefix": "/cpa",
-      "target": "http://127.0.0.1:8080",
+      "target": "http://127.0.0.1:7860",
       "strip_prefix": true,
-      "health": "http://127.0.0.1:8080/management.html",
+      "health": "http://127.0.0.1:7860/management.html",
       "enabled": true,
       "note": "API: /cpa/v1, /cpa/v1beta, /cpa/v0/management"
     },
@@ -45,9 +45,9 @@
     {
       "id": "root",
       "prefix": "/",
-      "target": "http://127.0.0.1:8080",
+      "target": "http://127.0.0.1:7860",
       "strip_prefix": false,
-      "health": "http://127.0.0.1:8080/management.html",
+      "health": "http://127.0.0.1:7860/management.html",
       "enabled": true,
       "note": "兜底: /assets 等绝对路径资源"
     }

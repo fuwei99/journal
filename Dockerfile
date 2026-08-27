@@ -14,14 +14,17 @@ FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    GATEWAY_PORT=7860 \
-    CLIPROXY_PORT=8080 \
+    GATEWAY_PORT=8080 \
+    CLIPROXY_PORT=7860 \
     DATA_DIR=/data \
     HOME=/data
 
-# ⚠️ 不要在这里设 ENV PORT：后端二进制也读 PORT 且优先级高于它自己的
-#    config.yaml，设了两个进程会抢同一个端口 -> address already in use。
-#    PaaS 注入的 PORT 由 supervisor 处理：gateway 用它，core 强制翻成 CLIPROXY_PORT。
+# ⚠️ 端口分配（别再改回来）:
+#      core    -> 7860   后端二进制在 cloud 模式下铁了心要 7860，
+#                        config.yaml 的 port 和 PORT 环境变量都压不住它，
+#                        与其硬碰不如避让。
+#      gateway -> 8080   唯一对外监听，PaaS 的 app_port 填 8080。
+#    不要设 ENV PORT：那个名字后端会抢，会导致两进程撞同一端口。
 
 # ca-certificates 必须装: 后端是 Go 程序，crypto/x509 只认标准路径的 CA，
 # 缺了会报 x509: certificate signed by unknown authority
@@ -44,10 +47,10 @@ COPY app/ /app/
 # HF Space 以任意 UID 运行容器，/data 必须对所有人可写
 RUN mkdir -p /data/auths && chmod -R 777 /data
 
-EXPOSE 7860
+EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
-  CMD curl -fsS http://127.0.0.1:7860/__health || exit 1
+  CMD curl -fsS http://127.0.0.1:8080/__health || exit 1
 
 # PID 1 是 supervisor: 渲染配置 -> 拉起后端 + 网关 -> 保活
 CMD ["python3", "/app/supervisor.py"]

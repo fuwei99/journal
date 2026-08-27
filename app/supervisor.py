@@ -84,7 +84,7 @@ def render_cliproxy_config() -> None:
 
     cfg = f"""# 由 supervisor.py 在容器启动时自动生成，改这里没用 —— 改环境变量。
 host: "127.0.0.1"
-port: {int(os.getenv("CLIPROXY_PORT", "8080"))}
+port: {int(os.getenv("CLIPROXY_PORT", "7860"))}
 
 tls:
   enable: false
@@ -195,7 +195,7 @@ def main() -> None:
     # ⚠️ 后端读 PORT 环境变量，优先级压过 config.yaml。
     #    容器的 PORT=7860 是留给 gateway 的，必须给后端单独注入自己的端口，
     #    否则两个进程抢 7860 -> "address already in use"，后端永远起不来。
-    core_port = os.getenv("CLIPROXY_PORT", "8080")
+    core_port = os.getenv("CLIPROXY_PORT", "7860")
     for p in procs:
         if p.id == "core":
             p.env_extra.setdefault("PORT", core_port)

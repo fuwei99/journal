@@ -1,4 +1,7 @@
 // 容器内进程表。supervisor.py 启动时读一次（容器生命周期内不变，无需热加载）。
+//
+// ⚠️ 端口分配: core=7860（内部）, gateway=8080（唯一对外）。
+//    后端二进制在 cloud 模式下强制 bind 7860，压不住，故让 gateway 避让。
 {
   "checkInterval": 15,   // 巡检间隔(秒)
   "startStagger": 2,     // 依次启动的间隔(秒)
@@ -7,24 +10,21 @@
     {
       "id": "core",
       "enabled": true,
-      // 二进制在 /opt/bin/，配置由 supervisor 从环境变量渲染到 /data/config.yaml
       "command": "/opt/bin/journal-core --config /data/config.yaml",
       "cwd": "/data",
-      // ⚠️ 后端也读 PORT 环境变量且优先级高于 config.yaml。
-      //    容器级 PORT=7860 归 gateway，这里必须覆盖，否则抢端口。
-      //    supervisor 会用 CLIPROXY_PORT 再兜一层，改端口改那个即可。
-      "env": { "PORT": "8080" },
-      "check": { "http": "http://127.0.0.1:8080/management.html" },
-      "grace": 25,          // Go 起来要连 Postgres 拉凭据，给足时间
+      // 它自己就要 7860，这里显式给上保持一致（supervisor 也会按 CLIPROXY_PORT 兜一层）
+      "env": { "PORT": "7860" },
+      "check": { "http": "http://127.0.0.1:7860/management.html" },
+      "grace": 25,          // 起来要连 Postgres 拉凭据，给足时间
       "restartDelay": 5
     },
     {
       "id": "gateway",
       "enabled": true,
-      // 唯一对外监听的进程，端口 = HF 要求的 7860
+      // 唯一对外监听的进程 —— PaaS 的 app_port 必须填 8080
       "command": "python3 /app/gateway.py",
       "cwd": "/app",
-      "check": { "http": "http://127.0.0.1:7860/__health" },
+      "check": { "http": "http://127.0.0.1:8080/__health" },
       "grace": 10,
       "restartDelay": 3
     }

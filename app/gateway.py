@@ -36,7 +36,7 @@ LOG = logging.getLogger("gateway")
 
 ROUTES_FILE = Path(os.getenv("ROUTES_FILE", "/app/routes.jsonc"))
 # GATEWAY_PORT 优先：容器里 PORT 可能被 PaaS 注入，也被后端二进制争用
-LISTEN_PORT = int(os.getenv("GATEWAY_PORT") or os.getenv("PORT") or "7860")
+LISTEN_PORT = int(os.getenv("GATEWAY_PORT") or os.getenv("PORT") or "8080")
 
 # 逐块转发，别攒着。攒了 SSE 就废了
 CHUNK = 8192
