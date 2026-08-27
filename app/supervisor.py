@@ -191,6 +191,16 @@ def main() -> None:
 
     spec = json.loads(strip_jsonc(PROCS_FILE.read_text(encoding="utf-8")))
     procs = [Proc(s) for s in spec.get("processes", spec) if s.get("enabled", True)]
+
+    # ⚠️ 后端读 PORT 环境变量，优先级压过 config.yaml。
+    #    容器的 PORT=7860 是留给 gateway 的，必须给后端单独注入自己的端口，
+    #    否则两个进程抢 7860 -> "address already in use"，后端永远起不来。
+    core_port = os.getenv("CLIPROXY_PORT", "8080")
+    for p in procs:
+        if p.id == "core":
+            p.env_extra.setdefault("PORT", core_port)
+            log(f"core 端口锁定 {core_port} (gateway 独占 {os.getenv('PORT', '7860')})")
+
     log(f"待管理进程 {len(procs)} 个: {', '.join(p.id for p in procs)}")
 
     def on_sig(signum, frame):

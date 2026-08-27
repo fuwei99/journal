@@ -14,10 +14,14 @@ FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=7860 \
+    GATEWAY_PORT=7860 \
     CLIPROXY_PORT=8080 \
     DATA_DIR=/data \
     HOME=/data
+
+# ⚠️ 不要在这里设 ENV PORT：后端二进制也读 PORT 且优先级高于它自己的
+#    config.yaml，设了两个进程会抢同一个端口 -> address already in use。
+#    PaaS 注入的 PORT 由 supervisor 处理：gateway 用它，core 强制翻成 CLIPROXY_PORT。
 
 # ca-certificates 必须装: 后端是 Go 程序，crypto/x509 只认标准路径的 CA，
 # 缺了会报 x509: certificate signed by unknown authority

@@ -10,6 +10,10 @@
       // 二进制在 /opt/bin/，配置由 supervisor 从环境变量渲染到 /data/config.yaml
       "command": "/opt/bin/journal-core --config /data/config.yaml",
       "cwd": "/data",
+      // ⚠️ 后端也读 PORT 环境变量且优先级高于 config.yaml。
+      //    容器级 PORT=7860 归 gateway，这里必须覆盖，否则抢端口。
+      //    supervisor 会用 CLIPROXY_PORT 再兜一层，改端口改那个即可。
+      "env": { "PORT": "8080" },
       "check": { "http": "http://127.0.0.1:8080/management.html" },
       "grace": 25,          // Go 起来要连 Postgres 拉凭据，给足时间
       "restartDelay": 5
