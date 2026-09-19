@@ -33,7 +33,7 @@
       "prefix": "/wb2",
       "target": "http://127.0.0.1:7863",
       "strip_prefix": true,
-      "health": "http://127.0.0.1:7863/healthz",
+      "health": "http://127.0.0.1:7863/v1/models",
       "enabled": true,
       "note": "OpenAI 兼容网关: /wb2/v1, /wb2/status"
     },

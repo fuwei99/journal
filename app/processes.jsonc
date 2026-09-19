@@ -25,7 +25,7 @@
       "command": "/opt/bin/wb2-core -config /data/wb2/config.json",
       "cwd": "/data/wb2",
       "env": { "PORT": "7863" },
-      "check": { "http": "http://127.0.0.1:7863/healthz" },
+      "check": { "http": "http://127.0.0.1:7863/v1/models" },
       "grace": 20,
       "restartDelay": 5
     },
