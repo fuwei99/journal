@@ -19,6 +19,17 @@
       "restartDelay": 5
     },
     {
+      "id": "wb2",
+      "enabled": true,
+      // 第二后端: OpenAI 兼容网关，只监听回环，由 gateway 按 /wb2 前缀反代
+      "command": "/opt/bin/wb2-core -config /data/wb2/config.json",
+      "cwd": "/data/wb2",
+      "env": { "PORT": "7863" },
+      "check": { "http": "http://127.0.0.1:7863/healthz" },
+      "grace": 20,
+      "restartDelay": 5
+    },
+    {
       "id": "gateway",
       "enabled": true,
       // 唯一对外监听的进程 —— PaaS 的 app_port 必须填 8080

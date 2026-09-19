@@ -73,6 +73,27 @@ jobs:
           echo "BACKEND_VERSION=$VER" >> "$GITHUB_ENV"
           ls -lh vendor/backend
 
+      # ── 第二后端：OpenAI 兼容网关，源码构建（上游仓库为公开仓）──
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: 构建第二后端二进制
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/Sliverkiss/workbuddy2api.git /tmp/wb2 \
+            || git clone --depth 1 https://github.com/fuwei99/work2api.git /tmp/wb2
+          cd /tmp/wb2
+          mkdir -p "$GITHUB_WORKSPACE/vendor" "$GITHUB_WORKSPACE/vendor/wb2-tools/scripts"
+          export CGO_ENABLED=0
+          go build -trimpath -ldflags="-s -w" -o "$GITHUB_WORKSPACE/vendor/wb2-core" ./cmd/server
+          go build -trimpath -ldflags="-s -w" -o "$GITHUB_WORKSPACE/vendor/wb2-tools/login" ./cmd/login
+          cp config.example.json "$GITHUB_WORKSPACE/vendor/wb2-config.example.json"
+          cp login.sh signin.sh credit.sh trial.sh "$GITHUB_WORKSPACE/vendor/wb2-tools/" 2>/dev/null || true
+          cp scripts/*.py "$GITHUB_WORKSPACE/vendor/wb2-tools/scripts/" 2>/dev/null || true
+          chmod +x "$GITHUB_WORKSPACE/vendor/wb2-tools/"*.sh
+          ls -lh "$GITHUB_WORKSPACE/vendor" "$GITHUB_WORKSPACE/vendor/wb2-tools"
+
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3

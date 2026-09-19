@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -131,6 +132,52 @@ max-retry-interval: 30
         log("⚠️ PGSTORE 未启用，凭据只在容器内，Space 重启即丢")
 
 
+def render_wb2_config() -> None:
+    """
+    第二后端（OpenAI 兼容网关）的 config.json。
+    从镜像内的 example 起手，再按环境变量覆盖 listen / api_key / 落盘路径，
+    保证上游新增字段的默认值一个不丢。
+    """
+    tmpl = Path(os.getenv("WB2_TEMPLATE", "/opt/wb2/config.example.json"))
+    wb2_dir = DATA_DIR / "wb2"
+    auth_dir = wb2_dir / "auths"
+    auth_dir.mkdir(parents=True, exist_ok=True)
+
+    port = int(os.getenv("WB2_PORT", "7863"))
+    api_key = os.getenv("WB2_API_KEY", "").strip() or os.getenv("API_KEY", "").strip()
+
+    cfg: dict[str, Any] = {}
+    if tmpl.is_file():
+        try:
+            cfg = json.loads(tmpl.read_text(encoding="utf-8"))
+        except Exception as e:
+            log(f"⚠️ wb2 模板解析失败({e})，改用最小配置")
+    else:
+        log(f"⚠️ 没找到 wb2 模板 {tmpl}，改用最小配置")
+
+    cfg["listen"] = f":{port}"
+    cfg["api_key"] = api_key
+    cfg["auth_dir"] = str(auth_dir)
+    cfg["state_file"] = str(wb2_dir / "state.json")
+
+    target = wb2_dir / "config.json"
+    target.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+    log(f"wb2 config.json 已生成 -> {target} (listen :{port}, auths {len(list(auth_dir.glob('*.json')))} 个)")
+
+    # 登录工具落到可写数据目录: login.sh 内部 cd 到自己所在目录并用相对 ./auths，
+    # 放 /data/wb2 才能和上面的 auth_dir 对齐（/opt 只读，落不进去）。
+    src = Path(os.getenv("WB2_TOOLS_SRC", "/opt/wb2"))
+    if src.is_dir():
+        try:
+            shutil.copytree(src, wb2_dir, dirs_exist_ok=True)
+            for pat in ("*.sh", "login"):
+                for f in wb2_dir.glob(pat):
+                    f.chmod(0o755)
+            log(f"wb2 登录工具已就位 -> {wb2_dir}/login.sh")
+        except Exception as e:
+            log(f"⚠️ wb2 工具拷贝失败: {e}")
+
+
 # ─────────────────────────── 判活 ───────────────────────────
 
 def check_http(url: str, timeout: float = 5.0) -> bool:
@@ -188,6 +235,7 @@ def main() -> None:
     log("=" * 52)
     log("deepmat-gateway 容器启动")
     render_cliproxy_config()
+    render_wb2_config()
 
     spec = json.loads(strip_jsonc(PROCS_FILE.read_text(encoding="utf-8")))
     procs = [Proc(s) for s in spec.get("processes", spec) if s.get("enabled", True)]

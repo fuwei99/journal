@@ -26,6 +26,18 @@
       "note": "API: /cpa/v1, /cpa/v1beta, /cpa/v0/management"
     },
 
+    // ── 第二后端: /wb2/v1/chat/completions -> /v1/chat/completions ──
+    // 客户端 BaseURL 填 https://<域名>/wb2/v1 即可
+    {
+      "id": "wb2",
+      "prefix": "/wb2",
+      "target": "http://127.0.0.1:7863",
+      "strip_prefix": true,
+      "health": "http://127.0.0.1:7863/healthz",
+      "enabled": true,
+      "note": "OpenAI 兼容网关: /wb2/v1, /wb2/status"
+    },
+
     // ── 以后加服务照这个抄，放在兜底 / 之前 ──
     // {
     //   "id": "myapp",

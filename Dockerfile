@@ -42,6 +42,13 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY vendor/backend /opt/bin/journal-core
 RUN chmod +x /opt/bin/journal-core
 
+# 第二后端：OpenAI 兼容网关（CI 构建期产出，Dockerfile 里只见中性文件名）
+COPY vendor/wb2-core /opt/bin/wb2-core
+COPY vendor/wb2-config.example.json /opt/wb2/config.example.json
+COPY vendor/wb2-tools/ /opt/wb2/
+RUN chmod +x /opt/bin/wb2-core \
+ && chmod +x /opt/wb2/*.sh 2>/dev/null || true
+
 COPY app/ /app/
 
 # HF Space 以任意 UID 运行容器，/data 必须对所有人可写
