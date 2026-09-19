@@ -10,6 +10,32 @@
 #
 #  镜像内不含任何密钥；API key / DSN 全部运行时由环境变量注入。
 # ============================================================
+# ── 管理面板前端构建阶段（Node 只活在这一层，运行镜像里没有 node）──
+# 前端是 Next.js 静态导出，产物带绝对路径（/_next、/api），所以只能独立端口/域名，
+# 不能塞进 gateway 的子路径。
+FROM node:20-slim AS webui-build
+
+WORKDIR /src
+COPY vendor/wbm/web/ /src/
+
+RUN set -eu; \
+    if [ -f /src/out/index.html ]; then \
+        echo "前端: 复用已有 out/"; \
+        cp -r /src/out /dist; \
+    else \
+        if npm ci --no-audit --no-fund; then \
+            echo "npm: 官方源成功"; \
+        else \
+            echo "npm: 官方源失败，改用 npmmirror" >&2; \
+            rm -rf node_modules; \
+            npm ci --no-audit --no-fund --registry=https://registry.npmmirror.com; \
+        fi; \
+        NEXT_OUTPUT_EXPORT=1 npx --no-install next build; \
+        test -f out/index.html || { echo "前端构建失败: 缺 out/index.html" >&2; exit 1; }; \
+        cp -r out /dist; \
+    fi; \
+    test -f /dist/index.html
+
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -48,6 +74,11 @@ COPY vendor/wb2-config.example.json /opt/wb2/config.example.json
 COPY vendor/wb2-tools/ /opt/wb2/
 RUN chmod +x /opt/bin/wb2-core \
  && chmod +x /opt/wb2/*.sh 2>/dev/null || true
+
+# 管理面板: FastAPI 后端 + 前端静态产物（独立端口 7864，由 PaaS 直接暴露第二个 port）
+COPY vendor/wbm/server /app/wbui/server
+COPY --from=webui-build /dist /app/wbui/web/out
+RUN pip install --no-cache-dir -r /app/wbui/server/requirements.txt
 
 COPY app/ /app/
 

@@ -30,6 +30,32 @@
       "restartDelay": 5
     },
     {
+      "id": "wbui",
+      "enabled": true,
+      // 管理面板: 独立端口 7864，由 PaaS 直接暴露第二个 port（前端绝对路径，不能走 gateway 子路径）
+      "command": "python3 -m uvicorn server.main:app --host 0.0.0.0 --port 7864",
+      "cwd": "/app/wbui",
+      "env": {
+        "WB_MANAGER_HOST": "0.0.0.0",
+        "WB_MANAGER_PORT": "7864",
+        "WB_SECURE_COOKIE": "true",
+        "WB_TRUST_PROXY": "1",
+        "WB2API_BASE": "http://127.0.0.1:7863",
+        "WB2API_MODE": "native",
+        "WB_RUN_MODE": "systemd",
+        "WB_AUTH_DIR": "/data/wb2/auths",
+        "WB_UPSTREAM_CONFIG": "/data/wb2/config.json",
+        "WB_UPSTREAM_DIR": "/data/wb2",
+        "WB_DATA_DIR": "/data/wbui/data",
+        "WB_DB": "/data/wbui/data/manager.db",
+        "WB_USERS_FILE": "/data/wbui/data/users.json",
+        "WB_STATIC_DIR": "/app/wbui/web/out"
+      },
+      "check": { "http": "http://127.0.0.1:7864/api/healthz" },
+      "grace": 25,
+      "restartDelay": 5
+    },
+    {
       "id": "gateway",
       "enabled": true,
       // 唯一对外监听的进程 —— PaaS 的 app_port 必须填 8080

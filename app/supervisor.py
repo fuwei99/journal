@@ -164,6 +164,9 @@ def render_wb2_config() -> None:
     target.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
     log(f"wb2 config.json 已生成 -> {target} (listen :{port}, auths {len(list(auth_dir.glob('*.json')))} 个)")
 
+    # 管理面板的数据目录（sqlite / users.json 落这儿，容器重建即丢）
+    (DATA_DIR / "wbui" / "data").mkdir(parents=True, exist_ok=True)
+
     # 登录工具落到可写数据目录: login.sh 内部 cd 到自己所在目录并用相对 ./auths，
     # 放 /data/wb2 才能和上面的 auth_dir 对齐（/opt 只读，落不进去）。
     src = Path(os.getenv("WB2_TOOLS_SRC", "/opt/wb2"))
