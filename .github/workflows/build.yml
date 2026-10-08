@@ -81,7 +81,8 @@ jobs:
       - name: 构建第二后端二进制
         run: |
           set -euo pipefail
-          git clone --depth 1 https://github.com/Sliverkiss/workbuddy2api.git /tmp/wb2 \
+          # 原 Sliverkiss/workbuddy2api 已删库；沿用 HanawaBanana 的延续仓库，再退到自家 fork
+          git clone --depth 1 https://github.com/HanawaBanana/workbuddy2api.git /tmp/wb2 \
             || git clone --depth 1 https://github.com/fuwei99/work2api.git /tmp/wb2
           cd /tmp/wb2
           mkdir -p "$GITHUB_WORKSPACE/vendor" "$GITHUB_WORKSPACE/vendor/wb2-tools/scripts"
