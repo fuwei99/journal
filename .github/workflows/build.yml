@@ -105,6 +105,22 @@ jobs:
           cp -r /tmp/wbm/web "$GITHUB_WORKSPACE/vendor/wbm/web"
           rm -rf "$GITHUB_WORKSPACE/vendor/wbm/web/out" \
                  "$GITHUB_WORKSPACE/vendor/wbm/web/node_modules"
+
+          # 上游把初始管理员用户名硬编码成 admin；这里改成读环境变量 WB_ADMIN_USER，
+          # 保持上游同步的同时允许自定义（只动这一行，其它不碰）。
+          python3 - "$GITHUB_WORKSPACE/vendor/wbm/server/security.py" <<'PYEOF'
+          import pathlib, sys
+          p = pathlib.Path(sys.argv[1])
+          s = p.read_text(encoding='utf-8')
+          old = "'users': [{'username': 'admin', 'role': 'admin', 'pwd_hash': make_hash(pwd)}],"
+          new = ("'users': [{'username': os.environ.get('WB_ADMIN_USER', '').strip() or 'admin',"
+                 " 'role': 'admin', 'pwd_hash': make_hash(pwd)}],")
+          if old not in s:
+              raise SystemExit('anchor not found: admin username line changed upstream')
+          p.write_text(s.replace(old, new), encoding='utf-8')
+          print('patched: WB_ADMIN_USER support')
+          PYEOF
+
           du -sh "$GITHUB_WORKSPACE/vendor/wbm"
 
       - uses: docker/setup-buildx-action@v3
