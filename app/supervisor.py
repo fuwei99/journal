@@ -181,6 +181,78 @@ def render_wb2_config() -> None:
             log(f"⚠️ wb2 工具拷贝失败: {e}")
 
 
+# ─────────────────── 面板数据自恢复（PG 异地备份）───────────────────
+# 面板自带「异地备份」：把本地 SQLite 全量镜像到 Postgres（设置页可配）。
+# 这个容器没有持久卷，重新部署 /data 就归零 —— 所以启动时若本地库还不存在，
+# 就从 PG 拉回来。只在「本地库不存在」时动手，绝不覆盖正在跑的实例。
+
+RESTORE_SCRIPT = r'''
+import os, sys
+from urllib.parse import unquote, urlparse
+
+sys.path.insert(0, "/app/wbui")
+os.chdir("/app/wbui")
+
+from server import db
+db.connect()                      # 建表 + 增量迁移（幂等）
+
+from server.services import pgsync
+
+u = urlparse(os.environ["WB_PGSYNC_DSN"])
+cfg = {
+    "host": u.hostname or "",
+    "port": u.port or 5432,
+    "dbname": (u.path or "/").lstrip("/"),
+    "user": unquote(u.username or ""),
+    "password": unquote(u.password or ""),
+    "sslmode": "require",
+    "keep_local_backup": False,
+}
+res = pgsync.import_from_pg(cfg, pgsync._Reporter("import"))
+print("恢复完成：%d 张表" % res.get("tables", 0))
+
+# 恢复会把 settings 表一起覆盖成镜像里的那份，里面的连接串可能是旧密码。
+# 用当前环境变量重新写一遍，保证后面的定时备份连得上。
+pgsync.save_config({
+    "enabled": True,
+    "host": cfg["host"], "port": cfg["port"], "dbname": cfg["dbname"],
+    "user": cfg["user"], "password": cfg["password"], "sslmode": cfg["sslmode"],
+    "interval_minutes": int(os.environ.get("WB_PGSYNC_INTERVAL", "1440")),
+    "keep_local_backup": True,
+})
+print("pg-sync 配置已按环境变量刷新")
+'''
+
+
+def restore_manager_from_pg() -> None:
+    """没有持久卷时的兜底：本地库不存在就从 PG 拉一份回来。"""
+    if not os.getenv("WB_PGSYNC_DSN", "").strip():
+        return
+    db_path = Path(os.getenv("WB_DB", str(DATA_DIR / "wbui" / "data" / "manager.db")))
+    if db_path.is_file() and db_path.stat().st_size > 8192:
+        log(f"面板本地库已存在（{db_path.stat().st_size} B），跳过 PG 恢复")
+        return
+    log("面板本地库不存在 —— 尝试从 Postgres 恢复…")
+    env = os.environ.copy()
+    env.update({
+        "WB_DATA_DIR": str(DATA_DIR / "wbui" / "data"),
+        "WB_DB": str(db_path),
+        "WB_USERS_FILE": str(DATA_DIR / "wbui" / "data" / "users.json"),
+        "WB_AUTH_DIR": str(DATA_DIR / "wb2" / "auths"),
+        "WB_STATIC_DIR": "/app/wbui/web/out",
+    })
+    try:
+        p = subprocess.run([sys.executable, "-c", RESTORE_SCRIPT],
+                           cwd="/app/wbui", env=env,
+                           capture_output=True, text=True, timeout=180)
+        for line in (p.stdout or "").strip().splitlines():
+            log(f"  [restore] {line}")
+        if p.returncode != 0:
+            log(f"⚠️ PG 恢复失败，面板照常启动：{(p.stderr or '').strip()[-400:]}")
+    except Exception as e:  # noqa: BLE001 —— 恢复失败绝不能挡住面板启动
+        log(f"⚠️ PG 恢复异常，面板照常启动：{e}")
+
+
 # ─────────────────────────── 判活 ───────────────────────────
 
 def check_http(url: str, timeout: float = 5.0) -> bool:
@@ -239,6 +311,7 @@ def main() -> None:
     log("deepmat-gateway 容器启动")
     render_cliproxy_config()
     render_wb2_config()
+    restore_manager_from_pg()
 
     spec = json.loads(strip_jsonc(PROCS_FILE.read_text(encoding="utf-8")))
     procs = [Proc(s) for s in spec.get("processes", spec) if s.get("enabled", True)]
