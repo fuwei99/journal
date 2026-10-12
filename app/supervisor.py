@@ -253,6 +253,26 @@ def restore_manager_from_pg() -> None:
         log(f"⚠️ PG 恢复异常，面板照常启动：{e}")
 
 
+def pull_files_from_pg() -> None:
+    """账号 / 面板用户这些**文件**也从 PG 拉回来（见 authsync）。"""
+    try:
+        import authsync
+        n = authsync.pull()
+        if n:
+            log(f"从 PG 拉回 {n} 个文件")
+    except Exception as e:  # noqa: BLE001
+        log(f"⚠️ 文件拉取失败（不影响启动）：{e}")
+
+
+def start_file_sync() -> None:
+    """常驻：本地文件一有变化就推到 PG。"""
+    try:
+        import authsync
+        authsync.start_background()
+    except Exception as e:  # noqa: BLE001
+        log(f"⚠️ 文件同步启动失败：{e}")
+
+
 # ─────────────────────────── 判活 ───────────────────────────
 
 def check_http(url: str, timeout: float = 5.0) -> bool:
@@ -312,6 +332,7 @@ def main() -> None:
     render_cliproxy_config()
     render_wb2_config()
     restore_manager_from_pg()
+    pull_files_from_pg()
 
     spec = json.loads(strip_jsonc(PROCS_FILE.read_text(encoding="utf-8")))
     procs = [Proc(s) for s in spec.get("processes", spec) if s.get("enabled", True)]
@@ -337,6 +358,8 @@ def main() -> None:
     for p in procs:
         p.start()
         time.sleep(float(spec.get("startStagger", 1)))
+
+    start_file_sync()
 
     interval = float(spec.get("checkInterval", 15))
     while not _stop.is_set():
