@@ -38,6 +38,19 @@
       "note": "OpenAI 兼容网关: /wb2/v1, /wb2/status"
     },
 
+    // ── 管理面板: /wbui/* -> 7864 ──
+    // 前端构建时设了 NEXT_PUBLIC_BASE_PATH=/wbui，产物与请求全带前缀，
+    // 所以能收进子路径 —— 原来那个独立对外端口（p02/7864）可以释放了。
+    {
+      "id": "wbui",
+      "prefix": "/wbui",
+      "target": "http://127.0.0.1:7864",
+      "strip_prefix": true,
+      "health": "http://127.0.0.1:7864/api/healthz",
+      "enabled": true,
+      "note": "管理面板: /wbui/"
+    },
+
     // ── 以后加服务照这个抄，放在兜底 / 之前 ──
     // {
     //   "id": "myapp",

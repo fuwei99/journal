@@ -30,7 +30,7 @@ RUN set -eu; \
             rm -rf node_modules; \
             npm ci --no-audit --no-fund --registry=https://registry.npmmirror.com; \
         fi; \
-        NEXT_OUTPUT_EXPORT=1 npx --no-install next build; \
+        NEXT_OUTPUT_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/wbui npx --no-install next build; \
         test -f out/index.html || { echo "前端构建失败: 缺 out/index.html" >&2; exit 1; }; \
         cp -r out /dist; \
     fi; \
